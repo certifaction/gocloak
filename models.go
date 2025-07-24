@@ -448,6 +448,7 @@ type ProtocolMappersConfig struct {
 	UserAttribute                      *string `json:"user.attribute,omitempty"`
 	IDTokenClaim                       *string `json:"id.token.claim,omitempty"`
 	AccessTokenClaim                   *string `json:"access.token.claim,omitempty"`
+	LigtweightTokenClaim               *string `json:"lightweight.claim,omitempty"`
 	ClaimName                          *string `json:"claim.name,omitempty"`
 	ClaimValue                         *string `json:"claim.value,omitempty"`
 	JSONTypeLabel                      *string `json:"jsonType.label,omitempty"`
