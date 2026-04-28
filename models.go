@@ -461,6 +461,8 @@ type ProtocolMappersConfig struct {
 	AttributeNameFormat                *string `json:"attribute.nameformat,omitempty"`
 	Single                             *string `json:"single,omitempty"`
 	Script                             *string `json:"script,omitempty"`
+	AddOrganizationAttributes          *string `json:"addOrganizationAttributes,omitempty"`
+	AddOrganizationId                  *string `json:"addOrganizationId,omitempty"`
 }
 
 // Client is a ClientRepresentation
@@ -736,6 +738,7 @@ type RolesRepresentation struct {
 }
 
 // RealmRepresentation represents a realm
+// https://www.keycloak.org/docs-api/latest/rest-api/index.html#RealmRepresentation
 type RealmRepresentation struct {
 	AccessCodeLifespan                                        *int                      `json:"accessCodeLifespan,omitempty"`
 	AccessCodeLifespanLogin                                   *int                      `json:"accessCodeLifespanLogin,omitempty"`
@@ -830,6 +833,7 @@ type RealmRepresentation struct {
 	UserFederationMappers                                     *[]interface{}            `json:"userFederationMappers,omitempty"`
 	UserFederationProviders                                   *[]interface{}            `json:"userFederationProviders,omitempty"`
 	UserManagedAccessAllowed                                  *bool                     `json:"userManagedAccessAllowed,omitempty"`
+	OrganizationsEnabled                                      *bool                     `json:"organizationsEnabled,omitempty"`
 	Users                                                     *[]User                   `json:"users,omitempty"`
 	VerifyEmail                                               *bool                     `json:"verifyEmail,omitempty"`
 	WaitIncrementSeconds                                      *int                      `json:"waitIncrementSeconds,omitempty"`
@@ -1446,6 +1450,66 @@ type GetClientUserSessionsParams struct {
 	Max   *int `json:"max,string,omitempty"`
 }
 
+// InviteeFormParams represents the form parameters used to invite a user to an organization
+type InviteeFormParams struct {
+	Email     *string `json:"email,omitempty"`
+	FirstName *string `json:"firstname,omitempty"`
+	LastName  *string `json:"lastname,omitempty"`
+}
+
+// GetMembersParams represents the optional parameters for getting members of an organization
+type GetMembersParams struct {
+	Exact          *bool           `json:"exact,string,omitempty"`
+	First          *int            `json:"first,string,omitempty"`
+	Max            *int            `json:"max,string,omitempty"`
+	MembershipType *MembershipType `json:"membershipetype,omitempty"`
+	Search         *string         `json:"search,omitempty"`
+}
+
+// MembershipType represent the membership type of an organization member.
+// v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#MembershipType
+type MembershipType struct{}
+
+// MemberRepresentation represents a member of an organization
+// v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#MemberRepresentation
+type MemberRepresentation struct {
+	User
+	// Type not defined in the Keycloak doc so I left it unexported. Help if you have more information
+	MembershipType *MembershipType `json:"membershipetype,omitempty"`
+}
+
+// GetOrganizationsParams represents the optional parameters for getting organizations
+type GetOrganizationsParams struct {
+	BriefRepresentation *bool   `json:"briefRepresentation,string,omitempty"`
+	Exact               *bool   `json:"exact,string,omitempty"`
+	First               *int    `json:"first,string,omitempty"`
+	Max                 *int    `json:"max,string,omitempty"`
+	Q                   *string `json:"q,omitempty"`
+	Search              *string `json:"search,omitempty"`
+}
+
+// OrganizationDomainRepresentation is a representation of an organization's domain
+// v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#OrganizationOrganizationDomainRepresentation
+type OrganizationDomainRepresentation struct {
+	Name     *string `json:"name,omitempty"`
+	Verified *bool   `json:"verified,omitempty"`
+}
+
+// OrganizationRepresentation is a representation of an organization
+// v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#OrganizationRepresentation
+type OrganizationRepresentation struct {
+	ID                *string                             `json:"id,omitempty"`
+	Name              *string                             `json:"name,omitempty"`
+	Alias             *string                             `json:"alias,omitempty"`
+	Enable            *bool                               `json:"enabled,omitempty"`
+	Description       *string                             `json:"description,omitempty"`
+	RedirectURL       *string                             `json:"redirectUrl,omitempty"`
+	Attributes        *map[string][]string                `json:"attributes,omitempty"`
+	Domains           *[]OrganizationDomainRepresentation `json:"domains,omitempty"`
+	Members           *[]MemberRepresentation             `json:"members,omitempty"`
+	IdentityProviders *[]IdentityProviderRepresentation   `json:"identityProviders,omitempty"`
+}
+
 // prettyStringStruct returns struct formatted into pretty string
 func prettyStringStruct(t interface{}) string {
 	json, err := json.MarshalIndent(t, "", "\t")
@@ -1540,3 +1604,10 @@ func (v *CredentialRepresentation) String() string                  { return pre
 func (v *RequiredActionProviderRepresentation) String() string      { return prettyStringStruct(v) }
 func (v *BruteForceStatus) String() string                          { return prettyStringStruct(v) }
 func (v *GetClientUserSessionsParams) String() string               { return prettyStringStruct(v) }
+func (v *GetOrganizationsParams) String() string                    { return prettyStringStruct(v) }
+func (v *InviteeFormParams) String() string                         { return prettyStringStruct(v) }
+func (v *GetMembersParams) String() string                          { return prettyStringStruct(v) }
+func (v *MembershipType) String() string                            { return prettyStringStruct(v) }
+func (v *MemberRepresentation) String() string                      { return prettyStringStruct(v) }
+func (v *OrganizationDomainRepresentation) String() string          { return prettyStringStruct(v) }
+func (v *OrganizationRepresentation) String() string                { return prettyStringStruct(v) }
