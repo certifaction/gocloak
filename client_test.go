@@ -7529,3 +7529,145 @@ func Test_GetMemberAssociatedOrganizations(t *testing.T) {
 
 	require.GreaterOrEqual(t, len(organizations), 1)
 }
+
+// inviteUserForTest creates an organization and a user, sends an invitation by e-mail,
+// and returns the org id, the user's e-mail, and a teardown that disposes of both.
+func inviteUserForTest(t *testing.T, client *gocloak.GoCloak, orgName, orgAlias, orgDomain string) (string, string, func()) {
+	t.Helper()
+	cfg := GetConfig(t)
+	token := GetAdminToken(t, client)
+
+	tdUser, userID := CreateUser(t, client)
+	tdOrg, orgID := CreateOrganization(t, client, orgName, orgAlias, orgDomain)
+
+	ctx := context.Background()
+	user, err := client.GetUserByID(ctx, token.AccessToken, cfg.GoCloak.Realm, userID)
+	require.NoError(t, err, "GetUserByID failed")
+
+	err = client.InviteUserToOrganizationByEmail(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		gocloak.InviteeFormParams{
+			Email:     user.Email,
+			FirstName: GetRandomNameP("FirstName"),
+			LastName:  GetRandomNameP("LastName"),
+		})
+	require.NoError(t, err, "InviteUserToOrganizationByEmail failed")
+
+	return orgID, *user.Email, func() {
+		tdOrg()
+		tdUser()
+	}
+}
+
+func Test_GetOrganizationInvitations(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, email, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc", "inv.com")
+	defer td()
+
+	invitations, err := client.GetOrganizationInvitations(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err, "GetOrganizationInvitations failed")
+	require.NotEmpty(t, invitations, "expected at least one invitation")
+
+	var found bool
+	for _, inv := range invitations {
+		if inv != nil && inv.Email != nil && *inv.Email == email {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "invited e-mail not present in list")
+}
+
+func Test_GetOrganizationInvitationByID(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, email, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc-byid", "inv-byid.com")
+	defer td()
+
+	ctx := context.Background()
+	invitations, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	require.NotEmpty(t, invitations)
+
+	got, err := client.GetOrganizationInvitationByID(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, *invitations[0].ID)
+	require.NoError(t, err, "GetOrganizationInvitationByID failed")
+	require.NotNil(t, got)
+	require.Equal(t, email, *got.Email)
+	require.Equal(t, orgID, *got.OrganizationID)
+}
+
+func Test_DeleteOrganizationInvitation(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, _, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc-del", "inv-del.com")
+	defer td()
+
+	ctx := context.Background()
+	invitations, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	require.NotEmpty(t, invitations)
+	invitationID := *invitations[0].ID
+
+	err = client.DeleteOrganizationInvitation(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, invitationID)
+	require.NoError(t, err, "DeleteOrganizationInvitation failed")
+
+	remaining, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	for _, inv := range remaining {
+		require.NotEqual(t, invitationID, *inv.ID, "deleted invitation still listed")
+	}
+}
+
+func Test_ResendOrganizationInvitation(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, email, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc-resend", "inv-resend.com")
+	defer td()
+
+	ctx := context.Background()
+	invitations, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	require.NotEmpty(t, invitations)
+
+	err = client.ResendOrganizationInvitation(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, *invitations[0].ID)
+	require.NoError(t, err, "ResendOrganizationInvitation failed")
+
+	after, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	var pendingForEmail int
+	for _, inv := range after {
+		if inv.Email != nil && *inv.Email == email && inv.Status != nil && *inv.Status == "PENDING" {
+			pendingForEmail++
+		}
+	}
+	require.Equal(t, 1, pendingForEmail, "expected exactly one PENDING invitation for the e-mail after resend")
+}

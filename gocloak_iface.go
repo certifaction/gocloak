@@ -580,6 +580,9 @@ type GoCloakIface interface {
 	GetUsersManagementPermissions(ctx context.Context, accessToken, realm string) (*ManagementPermissionRepresentation, error)
 	// CreateOrganization creates a new Organization
 	CreateOrganization(ctx context.Context, token, realm string, organization OrganizationRepresentation) (string, error)
+	// Adds the identity provider with the specified id to the organization
+	// POST /admin/realms/{realm}/organizations/{id}/identity-providers
+	AddIdentityProviderToOrganization(ctx context.Context, token, realm string, organizationID, identityProviderAlias string) error
 	// GetOrganizations returns a paginated list of organizations filtered according to the specified parameters
 	GetOrganizations(ctx context.Context, token, realm string, params GetOrganizationsParams) ([]*OrganizationRepresentation, error)
 	// DeleteOrganization deletes the organization
@@ -611,4 +614,14 @@ type GoCloakIface interface {
 	GetOrganizationMembers(ctx context.Context, token, realm, idOfOrganization string, params GetMembersParams) ([]*MemberRepresentation, error)
 	// GetMemberAssociatedOrganizations returns the organizations associated with the user that has the specified id
 	GetMemberAssociatedOrganizations(ctx context.Context, token, realm, idOfUser string) ([]*OrganizationRepresentation, error)
+	// GetOrganizationInvitations returns a paginated list of pending and expired invitations for the organization,
+	// filtered according to the specified parameters.
+	GetOrganizationInvitations(ctx context.Context, token, realm, idOfOrganization string, params GetOrganizationInvitationsParams) ([]*OrganizationInvitationRepresentation, error)
+	// GetOrganizationInvitationByID returns the invitation with the given id from the organization.
+	GetOrganizationInvitationByID(ctx context.Context, token, realm, idOfOrganization, invitationID string) (*OrganizationInvitationRepresentation, error)
+	// DeleteOrganizationInvitation removes the invitation with the given id from the organization.
+	DeleteOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error
+	// ResendOrganizationInvitation re-sends the invitation email for the given invitation. The previous
+	// invitation record is replaced by a fresh one.
+	ResendOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error
 }

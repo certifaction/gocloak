@@ -1510,6 +1510,33 @@ type OrganizationRepresentation struct {
 	IdentityProviders *[]IdentityProviderRepresentation   `json:"identityProviders,omitempty"`
 }
 
+// GetOrganizationInvitationsParams represents the optional parameters for listing
+// the invitations of an organization
+type GetOrganizationInvitationsParams struct {
+	First     *int    `json:"first,string,omitempty"`
+	Max       *int    `json:"max,string,omitempty"`
+	Status    *string `json:"status,omitempty"`
+	Email     *string `json:"email,omitempty"`
+	Search    *string `json:"search,omitempty"`
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+}
+
+// OrganizationInvitationRepresentation is a representation of an invitation to join an organization.
+// Status is one of "PENDING" or "EXPIRED".
+// v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#OrganizationInvitationRepresentation
+type OrganizationInvitationRepresentation struct {
+	ID             *string `json:"id,omitempty"`
+	OrganizationID *string `json:"organizationId,omitempty"`
+	Email          *string `json:"email,omitempty"`
+	FirstName      *string `json:"firstName,omitempty"`
+	LastName       *string `json:"lastName,omitempty"`
+	SentDate       *int    `json:"sentDate,omitempty"`
+	ExpiresAt      *int    `json:"expiresAt,omitempty"`
+	Status         *string `json:"status,omitempty"`
+	InviteLink     *string `json:"inviteLink,omitempty"`
+}
+
 // prettyStringStruct returns struct formatted into pretty string
 func prettyStringStruct(t interface{}) string {
 	json, err := json.MarshalIndent(t, "", "\t")
@@ -1611,3 +1638,5 @@ func (v *MembershipType) String() string                            { return pre
 func (v *MemberRepresentation) String() string                      { return prettyStringStruct(v) }
 func (v *OrganizationDomainRepresentation) String() string          { return prettyStringStruct(v) }
 func (v *OrganizationRepresentation) String() string                { return prettyStringStruct(v) }
+func (v *GetOrganizationInvitationsParams) String() string          { return prettyStringStruct(v) }
+func (v *OrganizationInvitationRepresentation) String() string      { return prettyStringStruct(v) }
