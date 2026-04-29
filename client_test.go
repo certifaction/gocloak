@@ -6695,11 +6695,6 @@ func Test_GetClientsWithPagination(t *testing.T) {
 }
 
 func Test_ImportIdentityProviderConfig(t *testing.T) {
-	// Skipped against Keycloak 25+: the imported provider config now contains an extra
-	// "metadataDescriptorUrl" field, so the test's hard-coded expected length no longer
-	// matches. Update the assertion when the Keycloak target is bumped.
-	t.Skip("incompatible with Keycloak 25: imported IDP config schema gained a metadataDescriptorUrl field")
-
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
@@ -6724,10 +6719,6 @@ func Test_ImportIdentityProviderConfig(t *testing.T) {
 		"useJwksUrl":        "true",
 	}
 
-	require.Len(
-		t, actual, len(expected),
-		"ImportIdentityProviderConfig should return exactly %d fields", len(expected))
-
 	for expectedKey, expectedVal := range expected {
 		require.Equal(
 			t, expectedVal, actual[expectedKey],
@@ -6737,10 +6728,6 @@ func Test_ImportIdentityProviderConfig(t *testing.T) {
 }
 
 func Test_ImportIdentityProviderConfigFromFile(t *testing.T) {
-	// Skipped against Keycloak 25+: the imported provider config now contains additional
-	// fields, so the test's hard-coded expected length no longer matches.
-	t.Skip("incompatible with Keycloak 25: imported IDP config schema gained extra fields")
-
 	// t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
@@ -6801,10 +6788,6 @@ E8go1LcvbfHNyknHu2sptnRq55fHZSHr18vVsQRfDYMG</ds:X509Certificate>
 		"enabledFromMetadata":             "true",
 		"idpEntityId":                     "https://accounts.google.com/o/saml2?idpid=C01unc9st",
 	}
-
-	require.Len(
-		t, actual, len(expected),
-		"ImportIdentityProviderConfig should return exactly %d fields", len(expected))
 
 	for expectedKey, expectedVal := range expected {
 		require.Equal(
