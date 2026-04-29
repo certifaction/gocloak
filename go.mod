@@ -1,4 +1,4 @@
-module github.com/certifaction/v14
+module github.com/certifaction/gocloak/v14
 
 go 1.25.0
 
