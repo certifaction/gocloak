@@ -624,4 +624,30 @@ type GoCloakIface interface {
 	// ResendOrganizationInvitation re-sends the invitation email for the given invitation. The previous
 	// invitation record is replaced by a fresh one.
 	ResendOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error
+
+	// Organization groups (Keycloak >= 26.6)
+
+	// CreateOrganizationGroup creates a new top-level group inside the organization,
+	// or moves an existing organization group to top-level when group.ID is set.
+	CreateOrganizationGroup(ctx context.Context, token, realm, idOfOrganization string, group Group) (string, error)
+	// GetOrganizationGroups returns the organization groups, filtered by the given parameters.
+	GetOrganizationGroups(ctx context.Context, token, realm, idOfOrganization string, params GetOrganizationGroupsParams) ([]*Group, error)
+	// GetOrganizationGroupByPath returns the organization group identified by the given group path (e.g. "parent/child").
+	GetOrganizationGroupByPath(ctx context.Context, token, realm, idOfOrganization, path string, params GetOrganizationGroupParams) (*Group, error)
+	// GetOrganizationGroup returns the organization group with the given id.
+	GetOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, params GetOrganizationGroupParams) (*Group, error)
+	// UpdateOrganizationGroup updates the name, description and attributes of an organization group.
+	UpdateOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, group Group) error
+	// DeleteOrganizationGroup deletes an organization group and all its subgroups.
+	DeleteOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string) error
+	// GetOrganizationSubGroups returns the children of the given organization group.
+	GetOrganizationSubGroups(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, params GetOrganizationSubGroupsParams) ([]*Group, error)
+	// CreateOrganizationSubGroup creates a new subgroup under the given organization group, or moves an existing one when group.ID is set.
+	CreateOrganizationSubGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, group Group) (string, error)
+	// GetOrganizationGroupMembers returns the members that belong to the given organization group.
+	GetOrganizationGroupMembers(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, params GetOrganizationGroupMembersParams) ([]*MemberRepresentation, error)
+	// AddUserToOrganizationGroup adds an organization member to the organization group.
+	AddUserToOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup, idOfUser string) error
+	// RemoveUserFromOrganizationGroup removes a user from the organization group; the user remains a member of the organization.
+	RemoveUserFromOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup, idOfUser string) error
 }
