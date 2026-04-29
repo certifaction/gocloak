@@ -1,4 +1,4 @@
-module github.com/Nerzal/gocloak/v13
+module github.com/certifaction/v14
 
 go 1.25.0
 
