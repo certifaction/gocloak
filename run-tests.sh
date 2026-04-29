@@ -15,12 +15,13 @@ while true; do
 done
 echo "Service is now available at ${keycloakServer}:8080"
 
-ARGS=()
 if [ $# -gt 0 ]; then
-    ARGS+=("-run")
-    ARGS+=("^($@)$")
+    IFS='|'
+    pattern="$*"
+    unset IFS
+    go test -failfast -race -cover -coverprofile=coverage.out -covermode=atomic -p 1 -parallel 1 -cpu 1,2 -bench . -benchmem -run "^(${pattern})$"
+else
+    go test -failfast -race -cover -coverprofile=coverage.out -covermode=atomic -p 1 -parallel 1 -cpu 1,2 -bench . -benchmem
 fi
-
-go test -failfast -race -cover -coverprofile=coverage.out -covermode=atomic -p 10 -cpu 1,2 -bench . -benchmem ${ARGS[@]}
 
 docker compose down
