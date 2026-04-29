@@ -656,6 +656,7 @@ func (g *GoCloak) LoginClientSignedJWT(
 ) (*JWT, error) {
 	claims := jwt.RegisteredClaims{
 		ExpiresAt: expiresAt,
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		Issuer:    clientID,
 		Subject:   clientID,
 		ID:        ksuid.New().String(),

@@ -1,16 +1,8 @@
 # gocloak
 
-[![codebeat badge](https://codebeat.co/badges/18a37f35-6a95-4e40-9e78-272233892332)](https://codebeat.co/projects/github-com-nerzal-gocloak-main)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Nerzal/gocloak)](https://goreportcard.com/report/github.com/Nerzal/gocloak)
-[![Go Doc](https://godoc.org/github.com/Nerzal/gocloak?status.svg)](https://godoc.org/github.com/Nerzal/gocloak)
-[![Build Status](https://github.com/Nerzal/gocloak/workflows/Tests/badge.svg)](https://github.com/Nerzal/gocloak/actions?query=branch%3Amain+event%3Apush)
-[![GitHub release](https://img.shields.io/github/tag/Nerzal/gocloak.svg)](https://GitHub.com/Nerzal/gocloak/releases/)
-[![codecov](https://codecov.io/gh/Nerzal/gocloak/branch/master/graph/badge.svg)](https://codecov.io/gh/Nerzal/gocloak)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FNerzal%2Fgocloak.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FNerzal%2Fgocloak?ref=badge_shield)
-
 Golang Keycloak API Package
 
-This client is based on: [go-keycloak](https://github.com/PhilippHeuer/go-keycloak)
+This client is based on: [go-keycloak](https://github.com/PhilippHeuer/go-keycloak), and is a fork that merges work from both [Nerzal/gocloak](https://github.com/Nerzal/gocloak) and [WilfredDube/gocloak](https://github.com/WilfredDube/gocloak).
 
 For Questions either raise an issue, or come to the [gopher-slack](https://invite.slack.golangbridge.org/) into the channel [#gocloak](https://gophers.slack.com/app_redirect?channel=gocloak)
 
@@ -129,6 +121,14 @@ To get the `clientId` from `id`, use `GetClients` method with `GetClientsParams{
 ```
 
 ## developing & testing
+
+Tests run in GitHub Actions on every push and pull request, and must pass before changes can be merged. Locally, run:
+
+```shell
+make test
+```
+
+This brings up Keycloak via docker compose, runs the test suite, and tears it down again.
 
 For local testing you need to start a docker container. Simply run following commands prior to starting the tests:
 
