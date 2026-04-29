@@ -578,4 +578,50 @@ type GoCloakIface interface {
 	UpdateUsersManagementPermissions(ctx context.Context, accessToken, realm string, managementPermissions ManagementPermissionRepresentation) (*ManagementPermissionRepresentation, error)
 	// GetUsersManagementPermissions returns the management permissions for users
 	GetUsersManagementPermissions(ctx context.Context, accessToken, realm string) (*ManagementPermissionRepresentation, error)
+	// CreateOrganization creates a new Organization
+	CreateOrganization(ctx context.Context, token, realm string, organization OrganizationRepresentation) (string, error)
+	// Adds the identity provider with the specified id to the organization
+	// POST /admin/realms/{realm}/organizations/{id}/identity-providers
+	AddIdentityProviderToOrganization(ctx context.Context, token, realm string, organizationID, identityProviderAlias string) error
+	// GetOrganizations returns a paginated list of organizations filtered according to the specified parameters
+	GetOrganizations(ctx context.Context, token, realm string, params GetOrganizationsParams) ([]*OrganizationRepresentation, error)
+	// DeleteOrganization deletes the organization
+	DeleteOrganization(ctx context.Context, token, realm, idOfOrganization string) error
+	// GetOrganizationByID returns the organization representation of the organization with provided ID
+	GetOrganizationByID(ctx context.Context, token, realm, idOfOrganization string) (*OrganizationRepresentation, error)
+	// UpdateOrganization updates the given organization
+	UpdateOrganization(ctx context.Context, token, realm string, organization OrganizationRepresentation) error
+	// InviteUserToOrganizationByID invites an existing user to the organization, using the specified user id
+	// An invitation email will be sent to the user so SMTP settings are required in keycloak
+	InviteUserToOrganizationByID(ctx context.Context, token, realm, idOfOrganization, userID string) error
+	// InviteUserToOrganizationByEmail invites an existing user or sends a registration link to a new user, based on the provided e-mail address.
+	// If the user with the given e-mail address exists, it sends an invitation link, otherwise it sends a registration link.
+	// An invitation email will be sent to the user so SMTP settings are required in keycloak
+	InviteUserToOrganizationByEmail(ctx context.Context, token, realm, idOfOrganization string, userParams InviteeFormParams) error
+	// AddUserToOrganization adds the user with the specified id as a member of the organization
+	// Adds, or associates, an existing user with the organization. If no user is found, or if it is already associated with the organization, an error response is returned
+	// No invitation email is sent to the user
+	AddUserToOrganization(ctx context.Context, token, realm, idOfOrganization, idOfUser string) error
+	// RemoveUserFromOrganization removes the user with the specified id from the organization
+	RemoveUserFromOrganization(ctx context.Context, token, realm, idOfOrganization, idOfUser string) error
+	// GetOrganizationMemberCount returns number of members in the organization.
+	GetOrganizationMemberCount(ctx context.Context, token, realm, idOfOrganization string) (int, error)
+	// GetOrganizationMemberByID returns the member of the organization with the specified id
+	// Searches for auser with the given id. If one is found, and is currently a member of the organization, returns it.
+	// Otherwise,an error response with status NOT_FOUND is returned
+	GetOrganizationMemberByID(ctx context.Context, token, realm, idOfOrganization, idOfUser string) (*MemberRepresentation, error)
+	// GetOrganizationMembers returns a paginated list of organization members filtered according to the specified parameters
+	GetOrganizationMembers(ctx context.Context, token, realm, idOfOrganization string, params GetMembersParams) ([]*MemberRepresentation, error)
+	// GetMemberAssociatedOrganizations returns the organizations associated with the user that has the specified id
+	GetMemberAssociatedOrganizations(ctx context.Context, token, realm, idOfUser string) ([]*OrganizationRepresentation, error)
+	// GetOrganizationInvitations returns a paginated list of pending and expired invitations for the organization,
+	// filtered according to the specified parameters.
+	GetOrganizationInvitations(ctx context.Context, token, realm, idOfOrganization string, params GetOrganizationInvitationsParams) ([]*OrganizationInvitationRepresentation, error)
+	// GetOrganizationInvitationByID returns the invitation with the given id from the organization.
+	GetOrganizationInvitationByID(ctx context.Context, token, realm, idOfOrganization, invitationID string) (*OrganizationInvitationRepresentation, error)
+	// DeleteOrganizationInvitation removes the invitation with the given id from the organization.
+	DeleteOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error
+	// ResendOrganizationInvitation re-sends the invitation email for the given invitation. The previous
+	// invitation record is replaced by a fresh one.
+	ResendOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error
 }

@@ -7112,3 +7112,562 @@ func Test_RevokeToken(t *testing.T) {
 	)
 	require.NoError(t, err, "Revoke failed")
 }
+
+// -----------
+// Organizations
+// -----------
+
+func CreateOrganization(t *testing.T, client gocloak.GoCloakIface, name, alias, domain string) (func(), string) {
+	cfg := GetConfig(t)
+	token := GetAdminToken(t, client)
+
+	org := gocloak.OrganizationRepresentation{
+		Name:        gocloak.StringP(name),
+		Alias:       gocloak.StringP(alias),
+		Enable:      gocloak.BoolP(true),
+		Description: gocloak.StringP("Just a test organization"),
+		Domains: &[]gocloak.OrganizationDomainRepresentation{
+			{
+				Name:     gocloak.StringP(domain),
+				Verified: gocloak.BoolP(true),
+			},
+		},
+	}
+
+	orgID, err := client.CreateOrganization(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		org)
+
+	require.NoError(t, err, "CreateOrganization failed")
+
+	org.ID = &orgID
+	t.Logf("Created Organization: %+v", org)
+	tearDown := func() {
+		err := client.DeleteOrganization(
+			context.Background(),
+			token.AccessToken,
+			cfg.GoCloak.Realm,
+			orgID)
+		require.NoError(t, err, "DeleteOrganization")
+	}
+
+	return tearDown, orgID
+}
+
+func Test_CreateOrganization(t *testing.T) {
+	t.Parallel()
+	client := NewClientWithDebug(t)
+
+	tearDown, _ := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+}
+
+func Test_GetOrganizations(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	// Create two organizations
+	tearDown1, _ := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown1()
+
+	tearDown2, _ := CreateOrganization(t, client, "Another Inc", "another-inc", "another.com")
+	defer tearDown2()
+
+	organizations, err := client.GetOrganizations(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		gocloak.GetOrganizationsParams{})
+	require.NoError(t, err, "GetOrganizations failed")
+	require.Equal(t, 2, len(organizations))
+	t.Log(organizations)
+}
+
+func Test_GetOrganizationsByName(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	tearDown, _ := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	organization, err := client.GetOrganizations(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		gocloak.GetOrganizationsParams{
+			Search: gocloak.StringP("Test Inc"),
+		})
+	require.NoError(t, err, "GetOrganizationByName failed")
+	t.Log(organization)
+}
+
+func Test_GetOrganizationsByDomain(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	tearDown, _ := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	organization, err := client.GetOrganizations(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		gocloak.GetOrganizationsParams{
+			Search: gocloak.StringP("test-inc.org"),
+		})
+	require.NoError(t, err, "GetOrganizationByDomain failed")
+	t.Log(organization)
+}
+
+func Test_GetOrganizationByID(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	organization, err := client.GetOrganizationByID(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID)
+	require.NoError(t, err, "GetOrganization failed")
+	t.Log(organization)
+}
+
+func Test_UpdateOrganization(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	organization, err := client.GetOrganizationByID(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID)
+	require.NoError(t, err, "GetOrganizationByID failed")
+
+	organization.Enable = gocloak.BoolP(false)
+
+	err = client.UpdateOrganization(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		*organization)
+	require.NoError(t, err, "UpdateOrganization failed")
+	t.Log(organization)
+}
+
+func Test_InviteUserToOrganizationByID(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	err := client.InviteUserToOrganizationByID(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "InviteUserToOrganizationByID failed")
+}
+
+func Test_InviteUserToOrganizationByEmail(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	ctx := context.Background()
+	user, err := client.GetUserByID(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		userID)
+	require.NoError(t, err, "GetUserByID failed")
+
+	err = client.InviteUserToOrganizationByEmail(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		gocloak.InviteeFormParams{
+			Email:     user.Email,
+			FirstName: GetRandomNameP("FirstName"),
+			LastName:  GetRandomNameP("LastName"),
+		})
+	require.NoError(t, err, "InviteUserToOrganizationByEmail failed")
+}
+
+func Test_AddUserToOrganization(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	err := client.AddUserToOrganization(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+}
+
+func Test_RemoveUserFromOrganization(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	ctx := context.Background()
+
+	err := client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	err = client.RemoveUserFromOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "RemoveUserFromOrganization failed")
+}
+
+func Test_GetOrganizationMemberCount(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	ctx := context.Background()
+	err := client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	count, err := client.GetOrganizationMemberCount(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID)
+
+	t.Logf("Members in Organization: %d", count)
+	require.Equal(t, 1, count)
+	require.NoError(t, err, "GetOrganizationMemberCount failed")
+}
+
+func Test_GetOrganizationMemberByID(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	ctx := context.Background()
+	err := client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	member, err := client.GetOrganizationMemberByID(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+
+	require.Equal(t, *member.ID, userID)
+	require.NoError(t, err, "GetOrganizationMemberByID failed")
+}
+
+func Test_GetOrganizationMembers(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	td2, userID2 := CreateUser(t, client)
+	defer td2()
+
+	tearDown, orgID := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown()
+
+	ctx := context.Background()
+	err := client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	err = client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		userID2)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	members, err := client.GetOrganizationMembers(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		gocloak.GetMembersParams{})
+	require.NoError(t, err, "GetOrganizationMembers failed")
+
+	fmt.Println(members)
+	require.GreaterOrEqual(t, len(members), 1)
+}
+
+func Test_GetMemberAssociatedOrganizations(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	td, userID := CreateUser(t, client)
+	defer td()
+
+	// Create two organizations
+	tearDown1, orgID1 := CreateOrganization(t, client, "Test Inc", "test-inc", "test.com")
+	defer tearDown1()
+
+	tearDown2, orgID2 := CreateOrganization(t, client, "Another Inc", "another-inc", "another.com")
+	defer tearDown2()
+
+	// Add user to both organizations
+	ctx := context.Background()
+	err := client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID1,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	err = client.AddUserToOrganization(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID2,
+		userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	organizations, err := client.GetMemberAssociatedOrganizations(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		userID)
+	require.NoError(t, err, "GetMemberAssociatedOrganizations failed")
+
+	require.GreaterOrEqual(t, len(organizations), 1)
+}
+
+// inviteUserForTest creates an organization and a user, sends an invitation by e-mail,
+// and returns the org id, the user's e-mail, and a teardown that disposes of both.
+func inviteUserForTest(t *testing.T, client *gocloak.GoCloak, orgName, orgAlias, orgDomain string) (string, string, func()) {
+	t.Helper()
+	cfg := GetConfig(t)
+	token := GetAdminToken(t, client)
+
+	tdUser, userID := CreateUser(t, client)
+	tdOrg, orgID := CreateOrganization(t, client, orgName, orgAlias, orgDomain)
+
+	ctx := context.Background()
+	user, err := client.GetUserByID(ctx, token.AccessToken, cfg.GoCloak.Realm, userID)
+	require.NoError(t, err, "GetUserByID failed")
+
+	err = client.InviteUserToOrganizationByEmail(
+		ctx,
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		gocloak.InviteeFormParams{
+			Email:     user.Email,
+			FirstName: GetRandomNameP("FirstName"),
+			LastName:  GetRandomNameP("LastName"),
+		})
+	require.NoError(t, err, "InviteUserToOrganizationByEmail failed")
+
+	return orgID, *user.Email, func() {
+		tdOrg()
+		tdUser()
+	}
+}
+
+func Test_GetOrganizationInvitations(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, email, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc", "inv.com")
+	defer td()
+
+	invitations, err := client.GetOrganizationInvitations(
+		context.Background(),
+		token.AccessToken,
+		cfg.GoCloak.Realm,
+		orgID,
+		gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err, "GetOrganizationInvitations failed")
+	require.NotEmpty(t, invitations, "expected at least one invitation")
+
+	var found bool
+	for _, inv := range invitations {
+		if inv != nil && inv.Email != nil && *inv.Email == email {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "invited e-mail not present in list")
+}
+
+func Test_GetOrganizationInvitationByID(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, email, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc-byid", "inv-byid.com")
+	defer td()
+
+	ctx := context.Background()
+	invitations, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	require.NotEmpty(t, invitations)
+
+	got, err := client.GetOrganizationInvitationByID(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, *invitations[0].ID)
+	require.NoError(t, err, "GetOrganizationInvitationByID failed")
+	require.NotNil(t, got)
+	require.Equal(t, email, *got.Email)
+	require.Equal(t, orgID, *got.OrganizationID)
+}
+
+func Test_DeleteOrganizationInvitation(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, _, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc-del", "inv-del.com")
+	defer td()
+
+	ctx := context.Background()
+	invitations, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	require.NotEmpty(t, invitations)
+	invitationID := *invitations[0].ID
+
+	err = client.DeleteOrganizationInvitation(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, invitationID)
+	require.NoError(t, err, "DeleteOrganizationInvitation failed")
+
+	remaining, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	for _, inv := range remaining {
+		require.NotEqual(t, invitationID, *inv.ID, "deleted invitation still listed")
+	}
+}
+
+func Test_ResendOrganizationInvitation(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+
+	orgID, email, td := inviteUserForTest(t, client, "Inv Inc", "inv-inc-resend", "inv-resend.com")
+	defer td()
+
+	ctx := context.Background()
+	invitations, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	require.NotEmpty(t, invitations)
+
+	err = client.ResendOrganizationInvitation(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, *invitations[0].ID)
+	require.NoError(t, err, "ResendOrganizationInvitation failed")
+
+	after, err := client.GetOrganizationInvitations(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, gocloak.GetOrganizationInvitationsParams{})
+	require.NoError(t, err)
+	var pendingForEmail int
+	for _, inv := range after {
+		if inv.Email != nil && *inv.Email == email && inv.Status != nil && *inv.Status == "PENDING" {
+			pendingForEmail++
+		}
+	}
+	require.Equal(t, 1, pendingForEmail, "expected exactly one PENDING invitation for the e-mail after resend")
+}
