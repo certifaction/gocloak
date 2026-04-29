@@ -3,6 +3,8 @@ services:
   keycloak:
     build: .
     command: -Dauto-build -Dfeatures=preview
+    depends_on:
+      - mailhog
     environment:
       KEYCLOAK_USER: admin
       KEYCLOAK_PASSWORD: secret
@@ -20,3 +22,8 @@ services:
     volumes:
       - ./testdata/gocloak-realm.json:/opt/keycloak/data/import/gocloak-realm.json
     entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev", "--features=preview,admin-fine-grained-authz:v1", "--import-realm"]
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"

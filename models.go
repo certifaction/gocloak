@@ -326,14 +326,17 @@ type SendVerificationMailParams struct {
 
 // Group is a Group
 type Group struct {
-	ID          *string              `json:"id,omitempty"`
-	Name        *string              `json:"name,omitempty"`
-	Path        *string              `json:"path,omitempty"`
-	SubGroups   *[]Group             `json:"subGroups,omitempty"`
-	Attributes  *map[string][]string `json:"attributes,omitempty"`
-	Access      *map[string]bool     `json:"access,omitempty"`
-	ClientRoles *map[string][]string `json:"clientRoles,omitempty"`
-	RealmRoles  *[]string            `json:"realmRoles,omitempty"`
+	ID            *string              `json:"id,omitempty"`
+	Name          *string              `json:"name,omitempty"`
+	Description   *string              `json:"description,omitempty"`
+	Path          *string              `json:"path,omitempty"`
+	ParentID      *string              `json:"parentId,omitempty"`
+	SubGroupCount *int                 `json:"subGroupCount,omitempty"`
+	SubGroups     *[]Group             `json:"subGroups,omitempty"`
+	Attributes    *map[string][]string `json:"attributes,omitempty"`
+	Access        *map[string]bool     `json:"access,omitempty"`
+	ClientRoles   *map[string][]string `json:"clientRoles,omitempty"`
+	RealmRoles    *[]string            `json:"realmRoles,omitempty"`
 }
 
 // GroupsCount represents the groups count response from keycloak
@@ -1537,6 +1540,45 @@ type OrganizationInvitationRepresentation struct {
 	InviteLink     *string `json:"inviteLink,omitempty"`
 }
 
+// GetOrganizationGroupsParams represents the optional parameters for listing organization groups
+// v26.6: GET /admin/realms/{realm}/organizations/{id}/groups
+type GetOrganizationGroupsParams struct {
+	Search              *string `json:"search,omitempty"`
+	Q                   *string `json:"q,omitempty"`
+	Exact               *bool   `json:"exact,string,omitempty"`
+	First               *int    `json:"first,string,omitempty"`
+	Max                 *int    `json:"max,string,omitempty"`
+	BriefRepresentation *bool   `json:"briefRepresentation,string,omitempty"`
+	PopulateHierarchy   *bool   `json:"populateHierarchy,string,omitempty"`
+	SubGroupsCount      *bool   `json:"subGroupsCount,string,omitempty"`
+}
+
+// GetOrganizationSubGroupsParams represents the optional parameters for listing
+// the children of an organization group.
+// v26.6: GET /admin/realms/{realm}/organizations/{id}/groups/{group-id}/children
+type GetOrganizationSubGroupsParams struct {
+	Search         *string `json:"search,omitempty"`
+	Exact          *bool   `json:"exact,string,omitempty"`
+	First          *int    `json:"first,string,omitempty"`
+	Max            *int    `json:"max,string,omitempty"`
+	SubGroupsCount *bool   `json:"subGroupsCount,string,omitempty"`
+}
+
+// GetOrganizationGroupMembersParams represents the optional parameters for listing
+// the members of an organization group.
+// v26.6: GET /admin/realms/{realm}/organizations/{id}/groups/{group-id}/members
+type GetOrganizationGroupMembersParams struct {
+	First               *int  `json:"first,string,omitempty"`
+	Max                 *int  `json:"max,string,omitempty"`
+	BriefRepresentation *bool `json:"briefRepresentation,string,omitempty"`
+}
+
+// GetOrganizationGroupParams represents the optional parameters for getting a single organization group.
+// v26.6: GET /admin/realms/{realm}/organizations/{id}/groups/{group-id}
+type GetOrganizationGroupParams struct {
+	SubGroupsCount *bool `json:"subGroupsCount,string,omitempty"`
+}
+
 // prettyStringStruct returns struct formatted into pretty string
 func prettyStringStruct(t interface{}) string {
 	json, err := json.MarshalIndent(t, "", "\t")
@@ -1640,3 +1682,7 @@ func (v *OrganizationDomainRepresentation) String() string          { return pre
 func (v *OrganizationRepresentation) String() string                { return prettyStringStruct(v) }
 func (v *GetOrganizationInvitationsParams) String() string          { return prettyStringStruct(v) }
 func (v *OrganizationInvitationRepresentation) String() string      { return prettyStringStruct(v) }
+func (v *GetOrganizationGroupsParams) String() string               { return prettyStringStruct(v) }
+func (v *GetOrganizationSubGroupsParams) String() string            { return prettyStringStruct(v) }
+func (v *GetOrganizationGroupMembersParams) String() string         { return prettyStringStruct(v) }
+func (v *GetOrganizationGroupParams) String() string                { return prettyStringStruct(v) }
