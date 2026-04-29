@@ -4730,3 +4730,63 @@ func (g *GoCloak) GetMemberAssociatedOrganizations(ctx context.Context, token, r
 
 	return result, err
 }
+
+// GetOrganizationInvitations returns a paginated list of pending and expired invitations for the organization,
+// filtered according to the specified parameters.
+func (g *GoCloak) GetOrganizationInvitations(ctx context.Context, token, realm, idOfOrganization string, params GetOrganizationInvitationsParams) ([]*OrganizationInvitationRepresentation, error) {
+	const errMessage = "could not get organization invitations"
+
+	queryParams, err := GetQueryParams(params)
+	if err != nil {
+		return nil, errors.Wrap(err, errMessage)
+	}
+
+	var result []*OrganizationInvitationRepresentation
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		SetQueryParams(queryParams).
+		SetResult(&result).
+		Get(g.getAdminRealmURL(realm, "organizations", idOfOrganization, "invitations"))
+
+	if err := checkForError(resp, err, errMessage); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// GetOrganizationInvitationByID returns the invitation with the given id from the organization.
+func (g *GoCloak) GetOrganizationInvitationByID(ctx context.Context, token, realm, idOfOrganization, invitationID string) (*OrganizationInvitationRepresentation, error) {
+	const errMessage = "could not get organization invitation by id"
+
+	var result *OrganizationInvitationRepresentation
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		SetResult(&result).
+		Get(g.getAdminRealmURL(realm, "organizations", idOfOrganization, "invitations", invitationID))
+
+	if err := checkForError(resp, err, errMessage); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteOrganizationInvitation removes the invitation with the given id from the organization.
+func (g *GoCloak) DeleteOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error {
+	const errMessage = "could not delete organization invitation"
+
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		Delete(g.getAdminRealmURL(realm, "organizations", idOfOrganization, "invitations", invitationID))
+
+	return checkForError(resp, err, errMessage)
+}
+
+// ResendOrganizationInvitation re-sends the invitation email for the given invitation. The previous
+// invitation record is replaced by a fresh one.
+func (g *GoCloak) ResendOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error {
+	const errMessage = "could not resend organization invitation"
+
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		Post(g.getAdminRealmURL(realm, "organizations", idOfOrganization, "invitations", invitationID, "resend"))
+
+	return checkForError(resp, err, errMessage)
+}
