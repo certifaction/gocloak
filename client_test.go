@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,6 +26,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/pkcs12"
+	"golang.org/x/mod/semver"
 
 	"github.com/certifaction/gocloak/v14"
 )
@@ -568,6 +570,25 @@ func ClearRealmCache(t testing.TB, client gocloak.GoCloakIface, realm ...string)
 		require.NoError(t, err, "ClearUserCache failed for a realm: %s", r)
 		err = client.ClearKeysCache(ctx, token.AccessToken, r)
 		require.NoError(t, err, "ClearKeysCache failed for a realm: %s", r)
+	}
+}
+
+// SkipIfKeycloakVersionLessThan calls t.Skip when the Keycloak server under
+// test is older than the given minimum version (semver "MAJOR.MINOR[.PATCH]"
+// without the leading "v"). Use it to gate tests that exercise endpoints
+// introduced after the baseline supported Keycloak release.
+func SkipIfKeycloakVersionLessThan(t testing.TB, client gocloak.GoCloakIface, minVersion string) {
+	t.Helper()
+	token := GetAdminToken(t, client)
+	info, err := client.GetServerInfo(context.Background(), token.AccessToken)
+	require.NoError(t, err, "GetServerInfo failed")
+	require.NotNil(t, info, "GetServerInfo returned nil")
+	require.NotNil(t, info.SystemInfo, "GetServerInfo.SystemInfo is nil")
+	require.NotNil(t, info.SystemInfo.Version, "GetServerInfo.SystemInfo.Version is nil")
+	cur := "v" + *info.SystemInfo.Version
+	min := "v" + minVersion
+	if semver.Compare(cur, min) < 0 {
+		t.Skipf("requires Keycloak >= %s (server reports %s)", minVersion, *info.SystemInfo.Version)
 	}
 }
 
@@ -1219,7 +1240,8 @@ func Test_GroupPermissions(t *testing.T) {
 		cfg.GoCloak.Realm,
 		groupID,
 	)
-	if err != nil && strings.Contains(err.Error(), "501") {
+	var apiErr *gocloak.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == http.StatusNotImplemented {
 		// Keycloak >= 26 disabled the legacy admin-fine-grained-authz (v1) feature
 		// and replaced it with FGAP v2 under a different REST surface.
 		t.Skip("admin-fine-grained-authz v1 not available on this Keycloak version")
@@ -1356,7 +1378,8 @@ func Test_ClientPermissions(t *testing.T) {
 		cfg.GoCloak.Realm,
 		idOfClient,
 	)
-	if err != nil && strings.Contains(err.Error(), "501") {
+	var apiErr *gocloak.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == http.StatusNotImplemented {
 		// Keycloak >= 26 disabled the legacy admin-fine-grained-authz (v1) feature
 		// and replaced it with FGAP v2 under a different REST surface.
 		t.Skip("admin-fine-grained-authz v1 not available on this Keycloak version")
@@ -7846,6 +7869,7 @@ func createOrganizationGroup(t *testing.T, client gocloak.GoCloakIface, orgID, n
 func Test_CreateOrganizationGroup(t *testing.T) {
 	t.Parallel()
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 
 	orgTearDown, orgID := CreateOrganization(t, client, "OG Inc", "og-inc", "og.com")
 	defer orgTearDown()
@@ -7858,6 +7882,7 @@ func Test_GetOrganizationGroups(t *testing.T) {
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 	token := GetAdminToken(t, client)
 	ctx := context.Background()
 
@@ -7880,6 +7905,7 @@ func Test_GetOrganizationGroup(t *testing.T) {
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 	token := GetAdminToken(t, client)
 	ctx := context.Background()
 
@@ -7902,6 +7928,7 @@ func Test_UpdateOrganizationGroup(t *testing.T) {
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 	token := GetAdminToken(t, client)
 	ctx := context.Background()
 
@@ -7932,6 +7959,7 @@ func Test_OrganizationSubGroups(t *testing.T) {
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 	token := GetAdminToken(t, client)
 	ctx := context.Background()
 
@@ -7959,6 +7987,7 @@ func Test_GetOrganizationGroupByPath(t *testing.T) {
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 	token := GetAdminToken(t, client)
 	ctx := context.Background()
 
@@ -7986,6 +8015,7 @@ func Test_AddRemoveUserOrganizationGroup(t *testing.T) {
 	t.Parallel()
 	cfg := GetConfig(t)
 	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
 	token := GetAdminToken(t, client)
 	ctx := context.Background()
 

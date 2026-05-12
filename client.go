@@ -4804,7 +4804,14 @@ func (g *GoCloak) CreateOrganizationGroup(ctx context.Context, token, realm, idO
 		return "", err
 	}
 
-	return getID(resp), nil
+	if resp.StatusCode() == http.StatusNoContent {
+		return "", nil
+	}
+	id := getID(resp)
+	if id == "" {
+		return "", errors.Wrap(errors.New("missing Location header in create response"), errMessage)
+	}
+	return id, nil
 }
 
 // GetOrganizationGroups returns the organization groups, filtered by the given parameters.
@@ -4838,13 +4845,18 @@ func (g *GoCloak) GetOrganizationGroups(ctx context.Context, token, realm, idOfO
 func (g *GoCloak) GetOrganizationGroupByPath(ctx context.Context, token, realm, idOfOrganization, path string, params GetOrganizationGroupParams) (*Group, error) {
 	const errMessage = "could not get organization group by path"
 
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" || strings.Contains(path, "//") {
+		return nil, errors.Wrap(errors.New("group path must be non-empty and must not contain empty segments"), errMessage)
+	}
+
 	queryParams, err := GetQueryParams(params)
 	if err != nil {
 		return nil, errors.Wrap(err, errMessage)
 	}
 
 	segments := []string{"organizations", idOfOrganization, "groups", "group-by-path"}
-	for _, p := range strings.Split(strings.Trim(path, "/"), "/") {
+	for _, p := range strings.Split(trimmed, "/") {
 		segments = append(segments, url.PathEscape(p))
 	}
 
@@ -4947,7 +4959,14 @@ func (g *GoCloak) CreateOrganizationSubGroup(ctx context.Context, token, realm, 
 		return "", err
 	}
 
-	return getID(resp), nil
+	if resp.StatusCode() == http.StatusNoContent {
+		return "", nil
+	}
+	id := getID(resp)
+	if id == "" {
+		return "", errors.Wrap(errors.New("missing Location header in create response"), errMessage)
+	}
+	return id, nil
 }
 
 // GetOrganizationGroupMembers returns the members that belong to the given organization group.
