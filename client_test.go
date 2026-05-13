@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,6 +26,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/pkcs12"
+	"golang.org/x/mod/semver"
 
 	"github.com/certifaction/gocloak/v14"
 )
@@ -568,6 +570,25 @@ func ClearRealmCache(t testing.TB, client gocloak.GoCloakIface, realm ...string)
 		require.NoError(t, err, "ClearUserCache failed for a realm: %s", r)
 		err = client.ClearKeysCache(ctx, token.AccessToken, r)
 		require.NoError(t, err, "ClearKeysCache failed for a realm: %s", r)
+	}
+}
+
+// SkipIfKeycloakVersionLessThan calls t.Skip when the Keycloak server under
+// test is older than the given minimum version (semver "MAJOR.MINOR[.PATCH]"
+// without the leading "v"). Use it to gate tests that exercise endpoints
+// introduced after the baseline supported Keycloak release.
+func SkipIfKeycloakVersionLessThan(t testing.TB, client gocloak.GoCloakIface, minVersion string) {
+	t.Helper()
+	token := GetAdminToken(t, client)
+	info, err := client.GetServerInfo(context.Background(), token.AccessToken)
+	require.NoError(t, err, "GetServerInfo failed")
+	require.NotNil(t, info, "GetServerInfo returned nil")
+	require.NotNil(t, info.SystemInfo, "GetServerInfo.SystemInfo is nil")
+	require.NotNil(t, info.SystemInfo.Version, "GetServerInfo.SystemInfo.Version is nil")
+	cur := "v" + *info.SystemInfo.Version
+	min := "v" + minVersion
+	if semver.Compare(cur, min) < 0 {
+		t.Skipf("requires Keycloak >= %s (server reports %s)", minVersion, *info.SystemInfo.Version)
 	}
 }
 
@@ -1219,6 +1240,12 @@ func Test_GroupPermissions(t *testing.T) {
 		cfg.GoCloak.Realm,
 		groupID,
 	)
+	var apiErr *gocloak.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == http.StatusNotImplemented {
+		// Keycloak >= 26 disabled the legacy admin-fine-grained-authz (v1) feature
+		// and replaced it with FGAP v2 under a different REST surface.
+		t.Skip("admin-fine-grained-authz v1 not available on this Keycloak version")
+	}
 	require.NoError(t, err, "GetGroupManagementPermissions failed")
 	require.Equal(t, false, *groupPermission.Enabled)
 
@@ -1351,6 +1378,12 @@ func Test_ClientPermissions(t *testing.T) {
 		cfg.GoCloak.Realm,
 		idOfClient,
 	)
+	var apiErr *gocloak.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == http.StatusNotImplemented {
+		// Keycloak >= 26 disabled the legacy admin-fine-grained-authz (v1) feature
+		// and replaced it with FGAP v2 under a different REST surface.
+		t.Skip("admin-fine-grained-authz v1 not available on this Keycloak version")
+	}
 	require.NoError(t, err, "GetClientManagementPermissions failed")
 	require.Equal(t, false, *clientPermissions.Enabled)
 
@@ -6719,6 +6752,13 @@ func Test_ImportIdentityProviderConfig(t *testing.T) {
 		"useJwksUrl":        "true",
 	}
 
+	// Keycloak 26 added metadataDescriptorUrl to OIDC discovery imports;
+	// older versions returned exactly the keys listed in `expected`. Allow
+	// extras so this test stays meaningful across Keycloak versions.
+	require.GreaterOrEqual(
+		t, len(actual), len(expected),
+		"ImportIdentityProviderConfig should return at least %d fields", len(expected))
+
 	for expectedKey, expectedVal := range expected {
 		require.Equal(
 			t, expectedVal, actual[expectedKey],
@@ -6775,7 +6815,9 @@ E8go1LcvbfHNyknHu2sptnRq55fHZSHr18vVsQRfDYMG</ds:X509Certificate>
 	require.NoError(t, err, "ImportIdentityProviderConfig failed")
 
 	expected := map[string]string{
-		"validateSignature":               "false",
+		// Keycloak 26 defaults validateSignature to "true" when metadata
+		// declares a signing certificate (it was "false" on older versions).
+		"validateSignature":               "true",
 		"signingCertificate":              "MIIDdDCCAlygAwIBAgIGAXkktKmDMA0GCSqGSIb3DQEBCwUAMHsxFDASBgNVBAoTC0dvb2dsZSBJ\nbmMuMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MQ8wDQYDVQQDEwZHb29nbGUxGDAWBgNVBAsTD0dv\nb2dsZSBGb3IgV29yazELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWEwHhcNMjEwNDMw\nMjEzNDQ4WhcNMjYwNDI5MjEzNDQ4WjB7MRQwEgYDVQQKEwtHb29nbGUgSW5jLjEWMBQGA1UEBxMN\nTW91bnRhaW4gVmlldzEPMA0GA1UEAxMGR29vZ2xlMRgwFgYDVQQLEw9Hb29nbGUgRm9yIFdvcmsx\nCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\nMIIBCgKCAQEAqU4c6Cc1+Iz38P9G4qOE9EMG/X6KdCQDEFm1xT1Bv4kWWMZhlnNh/pi94KgaSjJC\nL6kSK04KV0xGyPLu8BXI4ZMUlaSFx2qT4hzLmYf70CzfKzw482x9rN22bX3AA5fEf35vt1knCbYH\n3vC+GoDkmR4XrEEIocZpCxyfOokauyaUjyC1dhftl4dE3lP47e0xDEnZYNCivE29vNYIgXb5xwWM\nSfDu7MOoG4QP7VH/gOIxH+EIbgL7aTv1cCAfNToAGZatSYkKKsVIPiSeQIecmTEadS1ihJd2NyX8\niCV32DM1CN6WvA7OnsZ3j2wRWWlY2Rgp68VShFR4w7BSfXB6XQIDAQABMA0GCSqGSIb3DQEBCwUA\nA4IBAQAvvMZ7lqk23QLOVQBTKxTgP0n6OGaNFc9tgW9Tzj/68bX9vFZCSJ0O17NOlKIZyWIYpcAF\nty+ZK2rEv45zZRq+vx0qLc3bPheX1h/C7XS8EUDH69Qv8lApm7iw4gbMT4T4t4BDWFQ3C+Kf4XBN\nev9MLMa9V6ad5kY1vFYQx7wTvsIwhIs5A4FSdJilDEFSSQ4vcmB41pXzuS2LPrppO5fESbdNDget\ntUrq/b7peqRdz0jkOgaaoszXEAF8WIx3Gty/BaQ2jNFVMvHDz51I2g8nSWNbsZ3VliAVkhkhLETB\nE8go1LcvbfHNyknHu2sptnRq55fHZSHr18vVsQRfDYMG",
 		"postBindingLogout":               "false",
 		"postBindingResponse":             "true",
@@ -6788,6 +6830,13 @@ E8go1LcvbfHNyknHu2sptnRq55fHZSHr18vVsQRfDYMG</ds:X509Certificate>
 		"enabledFromMetadata":             "true",
 		"idpEntityId":                     "https://accounts.google.com/o/saml2?idpid=C01unc9st",
 	}
+
+	// Keycloak 26 added artifactBindingResponse to the SAML metadata import;
+	// older versions returned exactly the keys listed in `expected`. Allow
+	// extras so this test stays meaningful across Keycloak versions.
+	require.GreaterOrEqual(
+		t, len(actual), len(expected),
+		"ImportIdentityProviderConfig should return at least %d fields", len(expected))
 
 	for expectedKey, expectedVal := range expected {
 		require.Equal(
@@ -7787,4 +7836,219 @@ func Test_ResendOrganizationInvitation(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, pendingForEmail, "expected exactly one PENDING invitation for the e-mail after resend")
+}
+
+// -----------
+// Organization groups (Keycloak >= 26.6)
+// -----------
+
+// createOrganizationGroup creates a top-level group inside the organization and
+// returns its id together with a teardown closure.
+func createOrganizationGroup(t *testing.T, client gocloak.GoCloakIface, orgID, name string) (string, func()) {
+	cfg := GetConfig(t)
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	groupID, err := client.CreateOrganizationGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID,
+		gocloak.Group{
+			Name:        gocloak.StringP(name),
+			Description: gocloak.StringP("created by test"),
+		})
+	require.NoError(t, err, "CreateOrganizationGroup failed")
+	require.NotEmpty(t, groupID, "expected new group id from Location header")
+
+	tearDown := func() {
+		err := client.DeleteOrganizationGroup(
+			ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID)
+		require.NoError(t, err, "DeleteOrganizationGroup")
+	}
+	return groupID, tearDown
+}
+
+func Test_CreateOrganizationGroup(t *testing.T) {
+	t.Parallel()
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG Inc", "og-inc", "og.com")
+	defer orgTearDown()
+
+	_, tearDown := createOrganizationGroup(t, client, orgID, "engineering")
+	defer tearDown()
+}
+
+func Test_GetOrganizationGroups(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG List Inc", "og-list-inc", "og-list.com")
+	defer orgTearDown()
+
+	_, td1 := createOrganizationGroup(t, client, orgID, "team-a")
+	defer td1()
+	_, td2 := createOrganizationGroup(t, client, orgID, "team-b")
+	defer td2()
+
+	groups, err := client.GetOrganizationGroups(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID,
+		gocloak.GetOrganizationGroupsParams{})
+	require.NoError(t, err, "GetOrganizationGroups failed")
+	require.Len(t, groups, 2)
+}
+
+func Test_GetOrganizationGroup(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG Get Inc", "og-get-inc", "og-get.com")
+	defer orgTearDown()
+
+	groupID, td := createOrganizationGroup(t, client, orgID, "ops")
+	defer td()
+
+	group, err := client.GetOrganizationGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID,
+		gocloak.GetOrganizationGroupParams{})
+	require.NoError(t, err, "GetOrganizationGroup failed")
+	require.NotNil(t, group)
+	require.Equal(t, groupID, gocloak.PString(group.ID))
+	require.Equal(t, "ops", gocloak.PString(group.Name))
+}
+
+func Test_UpdateOrganizationGroup(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG Upd Inc", "og-upd-inc", "og-upd.com")
+	defer orgTearDown()
+
+	groupID, td := createOrganizationGroup(t, client, orgID, "old-name")
+	defer td()
+
+	err := client.UpdateOrganizationGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID,
+		gocloak.Group{
+			ID:          gocloak.StringP(groupID),
+			Name:        gocloak.StringP("new-name"),
+			Description: gocloak.StringP("updated"),
+		})
+	require.NoError(t, err, "UpdateOrganizationGroup failed")
+
+	group, err := client.GetOrganizationGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID,
+		gocloak.GetOrganizationGroupParams{})
+	require.NoError(t, err)
+	require.Equal(t, "new-name", gocloak.PString(group.Name))
+	require.Equal(t, "updated", gocloak.PString(group.Description))
+}
+
+func Test_OrganizationSubGroups(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG Sub Inc", "og-sub-inc", "og-sub.com")
+	defer orgTearDown()
+
+	parentID, parentTD := createOrganizationGroup(t, client, orgID, "parent")
+	defer parentTD()
+
+	childID, err := client.CreateOrganizationSubGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, parentID,
+		gocloak.Group{Name: gocloak.StringP("child")})
+	require.NoError(t, err, "CreateOrganizationSubGroup failed")
+	require.NotEmpty(t, childID)
+
+	children, err := client.GetOrganizationSubGroups(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, parentID,
+		gocloak.GetOrganizationSubGroupsParams{})
+	require.NoError(t, err, "GetOrganizationSubGroups failed")
+	require.Len(t, children, 1)
+	require.Equal(t, childID, gocloak.PString(children[0].ID))
+}
+
+func Test_GetOrganizationGroupByPath(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG Path Inc", "og-path-inc", "og-path.com")
+	defer orgTearDown()
+
+	parentID, parentTD := createOrganizationGroup(t, client, orgID, "parent-p")
+	defer parentTD()
+
+	childID, err := client.CreateOrganizationSubGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, parentID,
+		gocloak.Group{Name: gocloak.StringP("child-p")})
+	require.NoError(t, err)
+	require.NotEmpty(t, childID)
+
+	got, err := client.GetOrganizationGroupByPath(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, "parent-p/child-p",
+		gocloak.GetOrganizationGroupParams{})
+	require.NoError(t, err, "GetOrganizationGroupByPath failed")
+	require.NotNil(t, got)
+	require.Equal(t, childID, gocloak.PString(got.ID))
+}
+
+func Test_AddRemoveUserOrganizationGroup(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.6")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	userTD, userID := CreateUser(t, client)
+	defer userTD()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "OG Mem Inc", "og-mem-inc", "og-mem.com")
+	defer orgTearDown()
+
+	require.NoError(t, client.AddUserToOrganization(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, userID))
+
+	groupID, groupTD := createOrganizationGroup(t, client, orgID, "members-group")
+	defer groupTD()
+
+	require.NoError(t, client.AddUserToOrganizationGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID, userID),
+		"AddUserToOrganizationGroup failed")
+
+	members, err := client.GetOrganizationGroupMembers(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID,
+		gocloak.GetOrganizationGroupMembersParams{})
+	require.NoError(t, err, "GetOrganizationGroupMembers failed")
+	require.Len(t, members, 1)
+	require.Equal(t, userID, gocloak.PString(members[0].ID))
+
+	require.NoError(t, client.RemoveUserFromOrganizationGroup(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID, userID),
+		"RemoveUserFromOrganizationGroup failed")
+
+	members, err = client.GetOrganizationGroupMembers(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, groupID,
+		gocloak.GetOrganizationGroupMembersParams{})
+	require.NoError(t, err)
+	require.Empty(t, members)
 }
