@@ -345,3 +345,67 @@ func TestStringerOmitEmpty(t *testing.T) {
 		assert.Equal(t, "{}", custom.String())
 	}
 }
+
+func TestProtocolMappersConfig_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	// Server response that exercises the mapper-specific config keys added
+	// alongside the original typed set: introspection.token.claim,
+	// included.custom.audience, the address mapper's user.attribute.*
+	// subfields, and the usersessionmodel-note mapper's user.session.note.
+	// All must survive JSON -> struct -> JSON.
+	original := []byte(`{` +
+		`"access.token.claim":"true",` +
+		`"claim.name":"address",` +
+		`"id.token.claim":"true",` +
+		`"included.custom.audience":"core-api",` +
+		`"introspection.token.claim":"true",` +
+		`"user.attribute.country":"country",` +
+		`"user.attribute.formatted":"formatted",` +
+		`"user.attribute.locality":"locality",` +
+		`"user.attribute.postal_code":"postal_code",` +
+		`"user.attribute.region":"region",` +
+		`"user.attribute.street":"street",` +
+		`"user.session.note":"AUTH_TIME",` +
+		`"userinfo.token.claim":"true"` +
+		`}`)
+
+	var cfg gocloak.ProtocolMappersConfig
+	if err := json.Unmarshal(original, &cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// All keys map to typed fields.
+	assert.NotNil(t, cfg.AccessTokenClaim)
+	assert.Equal(t, "true", *cfg.AccessTokenClaim)
+	assert.NotNil(t, cfg.ClaimName)
+	assert.Equal(t, "address", *cfg.ClaimName)
+	assert.NotNil(t, cfg.IDTokenClaim)
+	assert.NotNil(t, cfg.UserinfoTokenClaim)
+	assert.NotNil(t, cfg.IntrospectionTokenClaim)
+	assert.NotNil(t, cfg.IncludedCustomAudience)
+	assert.Equal(t, "core-api", *cfg.IncludedCustomAudience)
+	assert.NotNil(t, cfg.UserSessionNote)
+	assert.Equal(t, "AUTH_TIME", *cfg.UserSessionNote)
+	assert.NotNil(t, cfg.UserAttributeFormatted)
+	assert.Equal(t, "formatted", *cfg.UserAttributeFormatted)
+	assert.NotNil(t, cfg.UserAttributeCountry)
+	assert.NotNil(t, cfg.UserAttributeLocality)
+	assert.NotNil(t, cfg.UserAttributePostalCode)
+	assert.NotNil(t, cfg.UserAttributeRegion)
+	assert.NotNil(t, cfg.UserAttributeStreet)
+
+	// Re-marshal: the JSON content must be identical key-for-key to the input.
+	out, err := json.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var got, want map[string]string
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	if err := json.Unmarshal(original, &want); err != nil {
+		t.Fatalf("unmarshal expected: %v", err)
+	}
+	assert.Equal(t, want, got)
+}

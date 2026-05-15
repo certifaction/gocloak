@@ -448,6 +448,7 @@ type ProtocolMappers struct {
 // ProtocolMappersConfig is a config of a protocol mapper
 type ProtocolMappersConfig struct {
 	UserinfoTokenClaim                 *string `json:"userinfo.token.claim,omitempty"`
+	IntrospectionTokenClaim            *string `json:"introspection.token.claim,omitempty"`
 	UserAttribute                      *string `json:"user.attribute,omitempty"`
 	IDTokenClaim                       *string `json:"id.token.claim,omitempty"`
 	AccessTokenClaim                   *string `json:"access.token.claim,omitempty"`
@@ -459,6 +460,7 @@ type ProtocolMappersConfig struct {
 	AggregateAttrs                     *string `json:"aggregate.attrs,omitempty"`
 	UsermodelClientRoleMappingClientID *string `json:"usermodel.clientRoleMapping.clientId,omitempty"`
 	IncludedClientAudience             *string `json:"included.client.audience,omitempty"`
+	IncludedCustomAudience             *string `json:"included.custom.audience,omitempty"`
 	FullPath                           *string `json:"full.path,omitempty"`
 	AttributeName                      *string `json:"attribute.name,omitempty"`
 	AttributeNameFormat                *string `json:"attribute.nameformat,omitempty"`
@@ -466,6 +468,13 @@ type ProtocolMappersConfig struct {
 	Script                             *string `json:"script,omitempty"`
 	AddOrganizationAttributes          *string `json:"addOrganizationAttributes,omitempty"`
 	AddOrganizationId                  *string `json:"addOrganizationId,omitempty"`
+	UserSessionNote                    *string `json:"user.session.note,omitempty"`
+	UserAttributeFormatted             *string `json:"user.attribute.formatted,omitempty"`
+	UserAttributeCountry               *string `json:"user.attribute.country,omitempty"`
+	UserAttributeLocality              *string `json:"user.attribute.locality,omitempty"`
+	UserAttributePostalCode            *string `json:"user.attribute.postal_code,omitempty"`
+	UserAttributeRegion                *string `json:"user.attribute.region,omitempty"`
+	UserAttributeStreet                *string `json:"user.attribute.street,omitempty"`
 }
 
 // Client is a ClientRepresentation
