@@ -4213,15 +4213,27 @@ func (g *GoCloak) MoveCredentialToFirst(ctx context.Context, token, realm, userI
 func (g *GoCloak) GetEvents(ctx context.Context, token string, realm string, params GetEventsParams) ([]*EventRepresentation, error) {
 	const errMessage = "could not get events"
 
+	// GetQueryParams roundtrips through map[string]string and can't represent
+	// the repeated `type` query parameter Keycloak expects, so handle Type
+	// separately via url.Values.
+	types := params.Type
+	params.Type = nil
 	queryParams, err := GetQueryParams(params)
 	if err != nil {
 		return nil, errors.Wrap(err, errMessage)
+	}
+	queryValues := url.Values{}
+	for k, v := range queryParams {
+		queryValues.Set(k, v)
+	}
+	for _, t := range types {
+		queryValues.Add("type", t)
 	}
 
 	var result []*EventRepresentation
 	resp, err := g.GetRequestWithBearerAuth(ctx, token).
 		SetResult(&result).
-		SetQueryParams(queryParams).
+		SetQueryParamsFromValues(queryValues).
 		Get(g.getAdminRealmURL(realm, "events"))
 
 	if err := checkForError(resp, err, errMessage); err != nil {
