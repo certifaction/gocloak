@@ -340,6 +340,18 @@ type GoCloakIface interface {
 	DeleteAuthenticationExecution(ctx context.Context, token, realm, executionID string) error
 	// CreateAuthenticationExecutionFlow creates a new execution for the given flow name in the given realm
 	CreateAuthenticationExecutionFlow(ctx context.Context, token, realm, flow string, executionFlow CreateAuthenticationExecutionFlowRepresentation) error
+	// CreateAuthenticationExecutionConfig creates a new authenticator config for the given execution and returns its ID
+	// POST /admin/realms/{realm}/authentication/executions/{executionID}/config
+	CreateAuthenticationExecutionConfig(ctx context.Context, token, realm, executionID string, config AuthenticatorConfigRepresentation) (string, error)
+	// GetAuthenticatorConfig returns the authenticator config with the given ID
+	// GET /admin/realms/{realm}/authentication/config/{configID}
+	GetAuthenticatorConfig(ctx context.Context, token, realm, configID string) (*AuthenticatorConfigRepresentation, error)
+	// UpdateAuthenticatorConfig updates the authenticator config with the given ID
+	// PUT /admin/realms/{realm}/authentication/config/{configID}
+	UpdateAuthenticatorConfig(ctx context.Context, token, realm, configID string, config AuthenticatorConfigRepresentation) error
+	// DeleteAuthenticatorConfig deletes the authenticator config with the given ID
+	// DELETE /admin/realms/{realm}/authentication/config/{configID}
+	DeleteAuthenticatorConfig(ctx context.Context, token, realm, configID string) error
 	// CreateUser creates the given user in the given realm and returns it's userID
 	// Note: Keycloak has not documented what members of the User object are actually being accepted, when creating a user.
 	// Things like RealmRoles must be attached using followup calls to the respective functions.
@@ -472,9 +484,15 @@ type GoCloakIface interface {
 	GetPolicy(ctx context.Context, token, realm, idOfClient, policyID string) (*PolicyRepresentation, error)
 	// GetPolicies returns policies associated with the client
 	GetPolicies(ctx context.Context, token, realm, idOfClient string, params GetPolicyParams) ([]*PolicyRepresentation, error)
-	// CreatePolicy creates a policy associated with the client
+	// CreatePolicy creates a policy associated with the client.
+	// The policy type is always appended to the path. Keycloak's older
+	// type-less endpoint POST /policy was supported on 20.x–25.x but was
+	// removed (returns 500 "Cannot parse the JSON") in 26.6, while
+	// POST /policy/{type} is accepted across all supported versions.
 	CreatePolicy(ctx context.Context, token, realm, idOfClient string, policy PolicyRepresentation) (*PolicyRepresentation, error)
-	// UpdatePolicy updates a policy associated with the client
+	// UpdatePolicy updates a policy associated with the client.
+	// As with CreatePolicy, the type segment is always included because
+	// Keycloak 26.6 rejects PUT /policy/{id} with "Cannot parse the JSON".
 	UpdatePolicy(ctx context.Context, token, realm, idOfClient string, policy PolicyRepresentation) error
 	// DeletePolicy deletes a policy associated with the client
 	DeletePolicy(ctx context.Context, token, realm, idOfClient, policyID string) error
@@ -583,6 +601,12 @@ type GoCloakIface interface {
 	// Adds the identity provider with the specified id to the organization
 	// POST /admin/realms/{realm}/organizations/{id}/identity-providers
 	AddIdentityProviderToOrganization(ctx context.Context, token, realm string, organizationID, identityProviderAlias string) error
+	// GetOrganizationIdentityProviders returns the identity providers associated with the organization
+	// GET /admin/realms/{realm}/organizations/{id}/identity-providers
+	GetOrganizationIdentityProviders(ctx context.Context, token, realm, organizationID string) ([]*IdentityProviderRepresentation, error)
+	// RemoveIdentityProviderFromOrganization removes the identity provider with the given alias from the organization
+	// DELETE /admin/realms/{realm}/organizations/{id}/identity-providers/{alias}
+	RemoveIdentityProviderFromOrganization(ctx context.Context, token, realm, organizationID, identityProviderAlias string) error
 	// GetOrganizations returns a paginated list of organizations filtered according to the specified parameters
 	GetOrganizations(ctx context.Context, token, realm string, params GetOrganizationsParams) ([]*OrganizationRepresentation, error)
 	// DeleteOrganization deletes the organization
@@ -624,30 +648,49 @@ type GoCloakIface interface {
 	// ResendOrganizationInvitation re-sends the invitation email for the given invitation. The previous
 	// invitation record is replaced by a fresh one.
 	ResendOrganizationInvitation(ctx context.Context, token, realm, idOfOrganization, invitationID string) error
-
-	// Organization groups (Keycloak >= 26.6)
-
 	// CreateOrganizationGroup creates a new top-level group inside the organization,
 	// or moves an existing organization group to top-level when group.ID is set.
+	// On create the new group's id is returned (parsed from the Location header);
+	// on move (Keycloak responds 204 No Content) the returned id is empty.
+	// POST /admin/realms/{realm}/organizations/{id}/groups
 	CreateOrganizationGroup(ctx context.Context, token, realm, idOfOrganization string, group Group) (string, error)
 	// GetOrganizationGroups returns the organization groups, filtered by the given parameters.
+	// When neither Search nor Q is provided, top-level groups of the organization are returned.
+	// GET /admin/realms/{realm}/organizations/{id}/groups
 	GetOrganizationGroups(ctx context.Context, token, realm, idOfOrganization string, params GetOrganizationGroupsParams) ([]*Group, error)
-	// GetOrganizationGroupByPath returns the organization group identified by the given group path (e.g. "parent/child").
+	// GetOrganizationGroupByPath returns the organization group identified by its path.
+	// The path is composed of group names joined by "/" (e.g. "parent/child"); pass it
+	// without a leading slash and without URL-escaping individual segments.
+	// GET /admin/realms/{realm}/organizations/{id}/groups/group-by-path/{path}
 	GetOrganizationGroupByPath(ctx context.Context, token, realm, idOfOrganization, path string, params GetOrganizationGroupParams) (*Group, error)
 	// GetOrganizationGroup returns the organization group with the given id.
+	// GET /admin/realms/{realm}/organizations/{id}/groups/{group-id}
 	GetOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, params GetOrganizationGroupParams) (*Group, error)
 	// UpdateOrganizationGroup updates the name, description and attributes of an organization group.
+	// Subgroups are not affected.
+	// PUT /admin/realms/{realm}/organizations/{id}/groups/{group-id}
 	UpdateOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, group Group) error
 	// DeleteOrganizationGroup deletes an organization group and all its subgroups.
+	// DELETE /admin/realms/{realm}/organizations/{id}/groups/{group-id}
 	DeleteOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string) error
 	// GetOrganizationSubGroups returns the children of the given organization group.
+	// GET /admin/realms/{realm}/organizations/{id}/groups/{group-id}/children
 	GetOrganizationSubGroups(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, params GetOrganizationSubGroupsParams) ([]*Group, error)
-	// CreateOrganizationSubGroup creates a new subgroup under the given organization group, or moves an existing one when group.ID is set.
+	// CreateOrganizationSubGroup creates a new subgroup under the given organization group,
+	// or moves an existing organization group to be a child of it when group.ID is set.
+	// On create the new group's id is returned (parsed from the Location header);
+	// on move (Keycloak responds 204 No Content) the returned id is empty.
+	// POST /admin/realms/{realm}/organizations/{id}/groups/{group-id}/children
 	CreateOrganizationSubGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, group Group) (string, error)
 	// GetOrganizationGroupMembers returns the members that belong to the given organization group.
+	// GET /admin/realms/{realm}/organizations/{id}/groups/{group-id}/members
 	GetOrganizationGroupMembers(ctx context.Context, token, realm, idOfOrganization, idOfGroup string, params GetOrganizationGroupMembersParams) ([]*MemberRepresentation, error)
-	// AddUserToOrganizationGroup adds an organization member to the organization group.
+	// AddUserToOrganizationGroup adds the user to the organization group. The user must
+	// already be a member of the organization.
+	// PUT /admin/realms/{realm}/organizations/{id}/groups/{group-id}/members/{userId}
 	AddUserToOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup, idOfUser string) error
-	// RemoveUserFromOrganizationGroup removes a user from the organization group; the user remains a member of the organization.
+	// RemoveUserFromOrganizationGroup removes the user from the organization group. The
+	// user remains a member of the organization itself.
+	// DELETE /admin/realms/{realm}/organizations/{id}/groups/{group-id}/members/{userId}
 	RemoveUserFromOrganizationGroup(ctx context.Context, token, realm, idOfOrganization, idOfGroup, idOfUser string) error
 }

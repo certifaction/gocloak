@@ -8052,3 +8052,138 @@ func Test_AddRemoveUserOrganizationGroup(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, members)
 }
+
+func Test_AuthenticatorConfig(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	authFlow := gocloak.AuthenticationFlowRepresentation{
+		Alias:      gocloak.StringP("test-authenticator-config-flow"),
+		BuiltIn:    gocloak.BoolP(false),
+		TopLevel:   gocloak.BoolP(true),
+		ProviderID: gocloak.StringP("basic-flow"),
+		ID:         gocloak.StringP("test-authenticator-config-flow-id"),
+	}
+	err := client.CreateAuthenticationFlow(ctx, token.AccessToken, cfg.GoCloak.Realm, authFlow)
+	require.NoError(t, err, "CreateAuthenticationFlow failed")
+	defer func() {
+		require.NoError(t, client.DeleteAuthenticationFlow(
+			ctx, token.AccessToken, cfg.GoCloak.Realm, *authFlow.ID),
+			"DeleteAuthenticationFlow failed")
+	}()
+
+	err = client.CreateAuthenticationExecution(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, *authFlow.Alias,
+		gocloak.CreateAuthenticationExecutionRepresentation{
+			Provider: gocloak.StringP("identity-provider-redirector"),
+		})
+	require.NoError(t, err, "CreateAuthenticationExecution failed")
+
+	executions, err := client.GetAuthenticationExecutions(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, *authFlow.Alias)
+	require.NoError(t, err, "GetAuthenticationExecutions failed")
+	require.Len(t, executions, 1)
+	executionID := gocloak.PString(executions[0].ID)
+	require.NotEmpty(t, executionID)
+
+	configID, err := client.CreateAuthenticationExecutionConfig(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, executionID,
+		gocloak.AuthenticatorConfigRepresentation{
+			Alias:  gocloak.StringP("test-authenticator-config"),
+			Config: &map[string]string{"defaultProvider": "some-idp"},
+		})
+	require.NoError(t, err, "CreateAuthenticationExecutionConfig failed")
+	require.NotEmpty(t, configID, "expected new config id from Location header")
+
+	config, err := client.GetAuthenticatorConfig(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, configID)
+	require.NoError(t, err, "GetAuthenticatorConfig failed")
+	require.Equal(t, "test-authenticator-config", gocloak.PString(config.Alias))
+	require.Equal(t, "some-idp", (*config.Config)["defaultProvider"])
+
+	// the created config must be referenced by the execution
+	executions, err = client.GetAuthenticationExecutions(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, *authFlow.Alias)
+	require.NoError(t, err)
+	require.Equal(t, configID, gocloak.PString(executions[0].AuthenticationConfig))
+
+	config.Config = &map[string]string{"defaultProvider": "another-idp"}
+	err = client.UpdateAuthenticatorConfig(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, configID, *config)
+	require.NoError(t, err, "UpdateAuthenticatorConfig failed")
+
+	config, err = client.GetAuthenticatorConfig(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, configID)
+	require.NoError(t, err)
+	require.Equal(t, "another-idp", (*config.Config)["defaultProvider"])
+
+	err = client.DeleteAuthenticatorConfig(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, configID)
+	require.NoError(t, err, "DeleteAuthenticatorConfig failed")
+
+	_, err = client.GetAuthenticatorConfig(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, configID)
+	require.Error(t, err, "expected 404 for deleted authenticator config")
+
+	// deleting the config must also detach it from the execution
+	executions, err = client.GetAuthenticationExecutions(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, *authFlow.Alias)
+	require.NoError(t, err)
+	require.Empty(t, gocloak.PString(executions[0].AuthenticationConfig))
+}
+
+func Test_OrganizationIdentityProviders(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.0")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	orgTearDown, orgID := CreateOrganization(t, client, "IdP Link Inc", "idp-link-inc", "idp-link.com")
+	defer orgTearDown()
+
+	idpAlias := "org-link-oidc"
+	_, err := client.CreateIdentityProvider(
+		ctx, token.AccessToken, cfg.GoCloak.Realm,
+		gocloak.IdentityProviderRepresentation{
+			Alias:      gocloak.StringP(idpAlias),
+			ProviderID: gocloak.StringP("oidc"),
+			Enabled:    gocloak.BoolP(true),
+			Config: &map[string]string{
+				"clientId":         "org-link-client",
+				"clientSecret":     "org-link-secret",
+				"authorizationUrl": "https://example.com/auth",
+				"tokenUrl":         "https://example.com/token",
+			},
+		})
+	require.NoError(t, err, "CreateIdentityProvider failed")
+	defer func() {
+		require.NoError(t, client.DeleteIdentityProvider(
+			ctx, token.AccessToken, cfg.GoCloak.Realm, idpAlias),
+			"DeleteIdentityProvider failed")
+	}()
+
+	err = client.AddIdentityProviderToOrganization(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, idpAlias)
+	require.NoError(t, err, "AddIdentityProviderToOrganization failed")
+
+	idps, err := client.GetOrganizationIdentityProviders(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID)
+	require.NoError(t, err, "GetOrganizationIdentityProviders failed")
+	require.Len(t, idps, 1)
+	require.Equal(t, idpAlias, gocloak.PString(idps[0].Alias))
+	require.Equal(t, orgID, gocloak.PString(idps[0].OrganizationID))
+
+	err = client.RemoveIdentityProviderFromOrganization(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, idpAlias)
+	require.NoError(t, err, "RemoveIdentityProviderFromOrganization failed")
+
+	idps, err = client.GetOrganizationIdentityProviders(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID)
+	require.NoError(t, err)
+	require.Empty(t, idps)
+}
