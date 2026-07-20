@@ -924,6 +924,13 @@ type ModifyAuthenticationExecutionRepresentation struct {
 	Description          *string   `json:"description"`
 }
 
+// AuthenticatorConfigRepresentation represents an authenticator config attached to an authentication execution
+type AuthenticatorConfigRepresentation struct {
+	ID     *string            `json:"id,omitempty"`
+	Alias  *string            `json:"alias,omitempty"`
+	Config *map[string]string `json:"config,omitempty"`
+}
+
 // MultiValuedHashMap represents something
 type MultiValuedHashMap struct {
 	Empty      *bool    `json:"empty,omitempty"`
@@ -1172,6 +1179,7 @@ type IdentityProviderRepresentation struct {
 	FirstBrokerLoginFlowAlias *string            `json:"firstBrokerLoginFlowAlias,omitempty"`
 	InternalID                *string            `json:"internalId,omitempty"`
 	LinkOnly                  *bool              `json:"linkOnly,omitempty"`
+	OrganizationID            *string            `json:"organizationId,omitempty"`
 	PostBrokerLoginFlowAlias  *string            `json:"postBrokerLoginFlowAlias,omitempty"`
 	ProviderID                *string            `json:"providerId,omitempty"`
 	StoreToken                *bool              `json:"storeToken,omitempty"`
@@ -1652,6 +1660,7 @@ func (v *UserInfo) String() string                                  { return pre
 func (v *RolesRepresentation) String() string                       { return prettyStringStruct(v) }
 func (v *RealmRepresentation) String() string                       { return prettyStringStruct(v) }
 func (v *MultiValuedHashMap) String() string                        { return prettyStringStruct(v) }
+func (v *AuthenticatorConfigRepresentation) String() string         { return prettyStringStruct(v) }
 func (t *TokenOptions) String() string                              { return prettyStringStruct(t) }
 func (t *RequestingPartyTokenOptions) String() string               { return prettyStringStruct(t) }
 func (v *RequestingPartyPermission) String() string                 { return prettyStringStruct(v) }

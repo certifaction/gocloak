@@ -2682,6 +2682,55 @@ func (g *GoCloak) CreateAuthenticationExecutionFlow(ctx context.Context, token, 
 	return checkForError(resp, err, errMessage)
 }
 
+// CreateAuthenticationExecutionConfig creates a new authenticator config for the given execution and returns its ID
+// POST /admin/realms/{realm}/authentication/executions/{executionID}/config
+func (g *GoCloak) CreateAuthenticationExecutionConfig(ctx context.Context, token, realm, executionID string, config AuthenticatorConfigRepresentation) (string, error) {
+	const errMessage = "could not create authentication execution config"
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).SetBody(config).
+		Post(g.getAdminRealmURL(realm, "authentication", "executions", executionID, "config"))
+
+	if err := checkForError(resp, err, errMessage); err != nil {
+		return "", err
+	}
+
+	return getID(resp), nil
+}
+
+// GetAuthenticatorConfig returns the authenticator config with the given ID
+// GET /admin/realms/{realm}/authentication/config/{configID}
+func (g *GoCloak) GetAuthenticatorConfig(ctx context.Context, token, realm, configID string) (*AuthenticatorConfigRepresentation, error) {
+	const errMessage = "could not get authenticator config"
+	var result *AuthenticatorConfigRepresentation
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		SetResult(&result).
+		Get(g.getAdminRealmURL(realm, "authentication", "config", configID))
+
+	if err := checkForError(resp, err, errMessage); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// UpdateAuthenticatorConfig updates the authenticator config with the given ID
+// PUT /admin/realms/{realm}/authentication/config/{configID}
+func (g *GoCloak) UpdateAuthenticatorConfig(ctx context.Context, token, realm, configID string, config AuthenticatorConfigRepresentation) error {
+	const errMessage = "could not update authenticator config"
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).SetBody(config).
+		Put(g.getAdminRealmURL(realm, "authentication", "config", configID))
+
+	return checkForError(resp, err, errMessage)
+}
+
+// DeleteAuthenticatorConfig deletes the authenticator config with the given ID
+// DELETE /admin/realms/{realm}/authentication/config/{configID}
+func (g *GoCloak) DeleteAuthenticatorConfig(ctx context.Context, token, realm, configID string) error {
+	const errMessage = "could not delete authenticator config"
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		Delete(g.getAdminRealmURL(realm, "authentication", "config", configID))
+
+	return checkForError(resp, err, errMessage)
+}
+
 // -----
 // Users
 // -----
@@ -4539,6 +4588,34 @@ func (g *GoCloak) AddIdentityProviderToOrganization(ctx context.Context, token, 
 	}
 
 	return nil
+}
+
+// GetOrganizationIdentityProviders returns the identity providers associated with the organization
+// GET /admin/realms/{realm}/organizations/{id}/identity-providers
+func (g *GoCloak) GetOrganizationIdentityProviders(ctx context.Context, token, realm, organizationID string) ([]*IdentityProviderRepresentation, error) {
+	const errMessage = "could not get organization identity providers"
+
+	var result []*IdentityProviderRepresentation
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		SetResult(&result).
+		Get(g.getAdminRealmURL(realm, "organizations", organizationID, "identity-providers"))
+
+	if err := checkForError(resp, err, errMessage); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// RemoveIdentityProviderFromOrganization removes the identity provider with the given alias from the organization
+// DELETE /admin/realms/{realm}/organizations/{id}/identity-providers/{alias}
+func (g *GoCloak) RemoveIdentityProviderFromOrganization(ctx context.Context, token, realm, organizationID, identityProviderAlias string) error {
+	const errMessage = "could not remove identity provider from organization"
+
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		Delete(g.getAdminRealmURL(realm, "organizations", organizationID, "identity-providers", identityProviderAlias))
+
+	return checkForError(resp, err, errMessage)
 }
 
 // GetOrganizations returns a paginated list of organizations filtered according to the specified parameters
