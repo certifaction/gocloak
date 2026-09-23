@@ -1482,20 +1482,27 @@ type GetMembersParams struct {
 	Exact          *bool           `json:"exact,string,omitempty"`
 	First          *int            `json:"first,string,omitempty"`
 	Max            *int            `json:"max,string,omitempty"`
-	MembershipType *MembershipType `json:"membershipetype,omitempty"`
+	MembershipType *MembershipType `json:"membershipType,omitempty"`
 	Search         *string         `json:"search,omitempty"`
 }
 
-// MembershipType represent the membership type of an organization member.
+// MembershipType represents the membership type of an organization member.
+// A MANAGED member is owned by the organization and is deleted from the realm
+// when the organization is removed or the member is removed from it; an
+// UNMANAGED member is a realm user merely linked to the organization.
 // v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#MembershipType
-type MembershipType struct{}
+type MembershipType string
+
+const (
+	MembershipTypeUnmanaged MembershipType = "UNMANAGED"
+	MembershipTypeManaged   MembershipType = "MANAGED"
+)
 
 // MemberRepresentation represents a member of an organization
 // v26: https://www.keycloak.org/docs-api/latest/rest-api/index.html#MemberRepresentation
 type MemberRepresentation struct {
 	User
-	// Type not defined in the Keycloak doc so I left it unexported. Help if you have more information
-	MembershipType *MembershipType `json:"membershipetype,omitempty"`
+	MembershipType *MembershipType `json:"membershipType,omitempty"`
 }
 
 // GetOrganizationsParams represents the optional parameters for getting organizations
