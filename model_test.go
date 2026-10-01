@@ -409,3 +409,43 @@ func TestProtocolMappersConfig_RoundTrip(t *testing.T) {
 	}
 	assert.Equal(t, want, got)
 }
+
+func TestAuthenticationExecutionPriority_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	// Keycloak 26.6+ treats a missing priority on the executions PUT as 0 and
+	// resets the stored value, so the field must survive GET -> struct -> PUT,
+	// including an explicit zero.
+	var exec gocloak.ModifyAuthenticationExecutionRepresentation
+	err := json.Unmarshal([]byte(`{"id":"abc","providerId":"auth-cookie","priority":0}`), &exec)
+	assert.NoError(t, err)
+	assert.NotNil(t, exec.Priority)
+	assert.Equal(t, 0, *exec.Priority)
+
+	out, err := json.Marshal(&exec)
+	assert.NoError(t, err)
+	assert.Contains(t, string(out), `"priority":0`)
+
+	// The create representations send priority when set and omit it when nil —
+	// nil keeps the legacy append-after-last-sibling semantics on the server.
+	withPrio, err := json.Marshal(&gocloak.CreateAuthenticationExecutionRepresentation{
+		Provider: gocloak.StringP("auth-otp-form"),
+		Priority: gocloak.IntP(10),
+	})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"provider":"auth-otp-form","priority":10}`, string(withPrio))
+
+	withoutPrio, err := json.Marshal(&gocloak.CreateAuthenticationExecutionRepresentation{
+		Provider: gocloak.StringP("auth-otp-form"),
+	})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"provider":"auth-otp-form"}`, string(withoutPrio))
+
+	flowOut, err := json.Marshal(&gocloak.CreateAuthenticationExecutionFlowRepresentation{
+		Alias:    gocloak.StringP("forms"),
+		Type:     gocloak.StringP("basic-flow"),
+		Priority: gocloak.IntP(20),
+	})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"alias":"forms","type":"basic-flow","priority":20}`, string(flowOut))
+}

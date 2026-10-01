@@ -897,6 +897,9 @@ type AuthenticationExecutionRepresentation struct {
 // CreateAuthenticationExecutionRepresentation contains the provider to be used for a new authentication representation
 type CreateAuthenticationExecutionRepresentation struct {
 	Provider *string `json:"provider,omitempty"`
+	// Priority orders the execution among its siblings (Keycloak 25+); when nil
+	// the server appends it after the last sibling.
+	Priority *int `json:"priority,omitempty"`
 }
 
 // CreateAuthenticationExecutionFlowRepresentation contains the provider to be used for a new authentication representation
@@ -905,6 +908,9 @@ type CreateAuthenticationExecutionFlowRepresentation struct {
 	Description *string `json:"description,omitempty"`
 	Provider    *string `json:"provider,omitempty"`
 	Type        *string `json:"type,omitempty"`
+	// Priority orders the sub-flow among its siblings (Keycloak 25+); when nil
+	// the server appends it after the last sibling.
+	Priority *int `json:"priority,omitempty"`
 }
 
 // ModifyAuthenticationExecutionRepresentation is the payload for updating an execution representation
@@ -921,7 +927,11 @@ type ModifyAuthenticationExecutionRepresentation struct {
 	Configurable         *bool     `json:"configurable,omitempty"`
 	Level                *int      `json:"level,omitempty"`
 	Index                *int      `json:"index,omitempty"`
-	Description          *string   `json:"description"`
+	// Priority orders the execution among its siblings. Keycloak 26.6+ honors it
+	// on update and treats a missing field as 0 — omitting it on a PUT resets the
+	// stored priority, so round-trip the value fetched from GetAuthenticationExecutions.
+	Priority    *int    `json:"priority,omitempty"`
+	Description *string `json:"description"`
 }
 
 // AuthenticatorConfigRepresentation represents an authenticator config attached to an authentication execution
