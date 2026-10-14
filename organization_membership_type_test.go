@@ -38,3 +38,13 @@ func TestGetMembersParamsMembershipTypeQuery(t *testing.T) {
 		t.Fatalf("query param membershipType=%q, want MANAGED (got params %v)", params["membershipType"], params)
 	}
 }
+
+func TestGetMembersParamsBriefRepresentationQuery(t *testing.T) {
+	params, err := GetQueryParams(GetMembersParams{BriefRepresentation: BoolP(false)})
+	if err != nil {
+		t.Fatalf("GetQueryParams: %v", err)
+	}
+	if params["briefRepresentation"] != "false" {
+		t.Fatalf("query param briefRepresentation=%q, want false (got params %v)", params["briefRepresentation"], params)
+	}
+}
