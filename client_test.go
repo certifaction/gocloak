@@ -7637,6 +7637,45 @@ func Test_GetOrganizationMembers(t *testing.T) {
 	require.GreaterOrEqual(t, len(members), 1)
 }
 
+func Test_GetOrganizationMembersBriefRepresentation(t *testing.T) {
+	t.Parallel()
+	cfg := GetConfig(t)
+	client := NewClientWithDebug(t)
+	SkipIfKeycloakVersionLessThan(t, client, "26.7")
+	token := GetAdminToken(t, client)
+	ctx := context.Background()
+
+	userTearDown, userID := CreateUser(t, client)
+	defer userTearDown()
+
+	user, err := client.GetUserByID(ctx, token.AccessToken, cfg.GoCloak.Realm, userID)
+	require.NoError(t, err, "GetUserByID failed")
+	user.RequiredActions = &[]string{"UPDATE_PASSWORD"}
+	err = client.UpdateUser(ctx, token.AccessToken, cfg.GoCloak.Realm, *user)
+	require.NoError(t, err, "UpdateUser failed")
+
+	orgTearDown, orgID := CreateOrganization(t, client, "Brief Inc", "brief-inc", "brief.com")
+	defer orgTearDown()
+
+	err = client.AddUserToOrganization(ctx, token.AccessToken, cfg.GoCloak.Realm, orgID, userID)
+	require.NoError(t, err, "AddUserToOrganization failed")
+
+	full, err := client.GetOrganizationMembers(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID,
+		gocloak.GetMembersParams{BriefRepresentation: gocloak.BoolP(false)})
+	require.NoError(t, err, "GetOrganizationMembers failed")
+	require.Len(t, full, 1)
+	require.NotNil(t, full[0].RequiredActions)
+	require.Contains(t, *full[0].RequiredActions, "UPDATE_PASSWORD")
+
+	brief, err := client.GetOrganizationMembers(
+		ctx, token.AccessToken, cfg.GoCloak.Realm, orgID,
+		gocloak.GetMembersParams{BriefRepresentation: gocloak.BoolP(true)})
+	require.NoError(t, err, "GetOrganizationMembers failed")
+	require.Len(t, brief, 1)
+	require.True(t, gocloak.NilOrEmptySlice(brief[0].RequiredActions))
+}
+
 func Test_GetMemberAssociatedOrganizations(t *testing.T) {
 	// Skipped against Keycloak 25: see Test_CreateOrganization.
 	t.Skip("incompatible with Keycloak 25: OrganizationRepresentation.alias was added in Keycloak 26")

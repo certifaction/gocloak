@@ -1489,11 +1489,12 @@ type InviteeFormParams struct {
 
 // GetMembersParams represents the optional parameters for getting members of an organization
 type GetMembersParams struct {
-	Exact          *bool           `json:"exact,string,omitempty"`
-	First          *int            `json:"first,string,omitempty"`
-	Max            *int            `json:"max,string,omitempty"`
-	MembershipType *MembershipType `json:"membershipType,omitempty"`
-	Search         *string         `json:"search,omitempty"`
+	BriefRepresentation *bool           `json:"briefRepresentation,string,omitempty"`
+	Exact               *bool           `json:"exact,string,omitempty"`
+	First               *int            `json:"first,string,omitempty"`
+	Max                 *int            `json:"max,string,omitempty"`
+	MembershipType      *MembershipType `json:"membershipType,omitempty"`
+	Search              *string         `json:"search,omitempty"`
 }
 
 // MembershipType represents the membership type of an organization member.

@@ -4705,12 +4705,18 @@ func (g *GoCloak) InviteUserToOrganizationByEmail(ctx context.Context, token, re
 		return errors.Wrap(errors.New("Email of invitee required"), errMessage)
 	}
 
+	formData := map[string]string{
+		"email": *userParams.Email,
+	}
+	if userParams.FirstName != nil {
+		formData["firstName"] = *userParams.FirstName
+	}
+	if userParams.LastName != nil {
+		formData["lastName"] = *userParams.LastName
+	}
+
 	resp, err := g.GetRequestWithBearerAuth(ctx, token).
-		SetFormData(map[string]string{
-			"email":     *userParams.Email,
-			"firstName": *userParams.FirstName,
-			"lastName":  *userParams.LastName,
-		}).
+		SetFormData(formData).
 		Post(g.getAdminRealmURL(realm, "organizations", idOfOrganization, "members", "invite-user"))
 
 	return checkForError(resp, err, errMessage)
